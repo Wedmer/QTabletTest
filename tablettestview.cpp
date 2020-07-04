@@ -202,37 +202,41 @@ bool TabletTestView::viewportEvent(QEvent *event)
 {
 	if(_disabletablet)
 		return QGraphicsView::viewportEvent(event);
+	QTabletEvent *tEvent=static_cast<QTabletEvent*>(event);
+	if(tEvent){
+		QPen pen(Qt::red);
+		pen.setWidthF((static_cast<QTabletEvent*>(event)->pressure()+.1)*10.0);
+		if(event->type() == QEvent::TabletMove) {
+			event->accept();
+			showTabletEvent(static_cast<QTabletEvent*>(event));
 
-	if(event->type() == QEvent::TabletMove) {
-		event->accept();
-		showTabletEvent(static_cast<QTabletEvent*>(event));
+			// Continue pointer path
+			if(_pendown) {
+				QPainterPath path = _pointerpath->path();
+				path.lineTo(tabletEventPos(event));
+				_pointerpath->setPen(pen);
+				_pointerpath->setPath(path);
+			}
 
-		// Continue pointer path
-		if(_pendown) {
-			QPainterPath path = _pointerpath->path();
-			path.lineTo(tabletEventPos(event));
+		} else if(event->type() == QEvent::TabletPress) {
+			event->accept();
+			_pendown = true;
+			showTabletEvent(static_cast<QTabletEvent*>(event));
+
+			// Start pointer path
+			QPainterPath path;
+			path.moveTo(tabletEventPos(event));
 			_pointerpath->setPath(path);
+			_pointerpath->setPen(pen);
+			_pointerpath->show();
+
+		} else if(event->type() == QEvent::TabletRelease) {
+			event->accept();
+			_pendown = false;
+			showTabletEvent(static_cast<QTabletEvent*>(event));
+		} else {
+			return QGraphicsView::viewportEvent(event);
 		}
-
-	} else if(event->type() == QEvent::TabletPress) {
-		event->accept();
-		_pendown = true;
-		showTabletEvent(static_cast<QTabletEvent*>(event));
-
-		// Start pointer path
-		QPainterPath path;
-		path.moveTo(tabletEventPos(event));
-		_pointerpath->setPath(path);
-		_pointerpath->setPen(QPen(Qt::red));
-		_pointerpath->show();
-
-	} else if(event->type() == QEvent::TabletRelease) {
-		event->accept();
-		_pendown = false;
-		showTabletEvent(static_cast<QTabletEvent*>(event));
-
-	} else {
-		return QGraphicsView::viewportEvent(event);
 	}
 
 	return true;
@@ -283,13 +287,14 @@ void TabletTestView::showTabletEvent(QTabletEvent *event)
 	_pointeritem->setPos(event->pos());
 	QPointF pos = tabletEventPos(event);
 	_pointertext->setText(
-				QString("%1 (%2) %3 at %4, %5, pressure=%6%")
+				QString("%1 (%2) %3 at %4, %5, pressure=%6%, xTilt=%7, yTilt=%8")
 				.arg(devicename(event->device()))
 				.arg(pointername(event->pointerType()))
 				.arg(action)
 				.arg(pos.x(), 0, 'f', 1)
 				.arg(pos.y(), 0, 'f', 1)
 				.arg(event->pressure() * 100.0, 0, 'f', 1)
+				.arg(event->xTilt()).arg(event->yTilt())
 	);
 	emit logEvent(_pointertext->text());
 }
